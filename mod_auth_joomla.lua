@@ -10,6 +10,8 @@ local DBI = require "DBI"
 local md5 = require "util.hashes".md5;
 local uuid_gen = require "util.uuid".generate;
 
+local base64 = require "util.encodings".base64;
+
 local connection;
 local params = module:get_option("sql");
 local prefix = params and params.prefix or "jos_";
@@ -93,7 +95,28 @@ local function getCryptedPassword(plaintext, salt)
 	local salted = plaintext..salt;
 	return md5(salted, true);
 end
+
+local function exec_php(command)
+    local p = assert(io.popen(command))
+    local result = p:read("*all")
+    p:close()
+    return result
+end
+
 local function joomlaCheckHash(password, hash)
+
+	if (hash:sub(1, 4) == "$2y$")or(hash:sub(1, 4) == "$2a$") then
+--  Add here!
+          p=base64.encode(password);
+          t=base64.encode(hash);
+--  To check where exec directory:
+--          res=exec_php('pwd');
+--	  module:log("debug", "php pwd=%s", res);
+
+          res=exec_php('/usr/bin/php-cgi -q jm_pwd_test.php pass='..p..' hash='..t);
+--	  module:log("debug", "php result=%s", res);
+          return (res=="1");
+        end
 	local crypt, salt = hash:match("^([^:]*):(.*)$");
 	return (crypt or hash) == getCryptedPassword(password, salt or '');
 end
